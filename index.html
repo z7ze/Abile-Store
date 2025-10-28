@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Abile Store</title>
     <meta name="color-scheme" content="dark" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src https:; frame-ancestors 'none'; upgrade-insecure-requests"> 
     <style>
         :root{ --bg:#0a0b10; --bg-2:#0e1117; --text:#fff; --muted:#aeb6c2; --card:rgba(255,255,255,0.06); --card-2:rgba(255,255,255,0.08); --card-border:rgba(255,255,255,0.12); --accent:#7c5cff; --accent-2:#9f86ff; --accent-glow:rgba(124,92,255,0.25); --success:#2ecc71; --danger:#ff5c7a; --warning:#f6d046; --shadow:0 10px 30px rgba(0,0,0,0.35); }
         *{box-sizing:border-box}
@@ -89,7 +90,7 @@
     <div class="container">
         <header>
             <div class="brand">
-                <div class="brand-icon"></div>
+                <div class="brand-icon" id="brandIcon"></div>
                 <div>
                     <div class="brand-text">Abile Store</div>
                     <div class="muted" style="font-size:13px">متجر رقمي احترافي</div>
@@ -236,6 +237,10 @@
 
         function getWebhooks(){try{const v=jget(KEYS.webhooks,{});return {logs:v.logs||WEBHOOK_DEFAULT_LOGS,orders:v.orders||WEBHOOK_DEFAULT_ORDERS}}catch{return {logs:WEBHOOK_DEFAULT_LOGS,orders:WEBHOOK_DEFAULT_ORDERS}}}
         async function sendWebhook(url,content){try{await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(content)})}catch(e){}}
+        // basic client-side rate limiting per kind (drops excess within 60s)
+        const _rate={};
+        function canSend(kind){ const now=Date.now(); const arr=(_rate[kind]||[]).filter(t=> now-t<60000 ); if(arr.length>=8) return false; arr.push(now); _rate[kind]=arr; return true; }
+        async function safeWebhook(kind,url,content){ if(!canSend(kind)) return; return sendWebhook(url,content); }
         async function logEvent(name,data){const {logs}=getWebhooks();await sendWebhook(logs,{username:'Abile Store Logs',embeds:[{title:name,color:5814783,timestamp:new Date().toISOString(),fields:Object.entries(data||{}).map(([k,v])=>({name:k,value:'```json\n'+JSON.stringify(v,null,2)+'\n```'}))}]})}
 
         const productsList=document.getElementById('productsList');
@@ -288,6 +293,8 @@
         function setOrders(v){jset('abile.orders',v)}
         function toast(msg,kind='ok'){const el=document.createElement('div');el.className='toast '+kind;el.textContent=msg;toasts.appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),420)},2400)}
         function copyText(t){navigator.clipboard?.writeText(t).then(()=>toast('تم النسخ ✓','ok')).catch(()=>{try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('تم النسخ ✓','ok');}catch{toast('تعذر النسخ','err');}})}
+        function sanitizeEmail(v){ return String(v).trim().slice(0,120); }
+        function sanitizePhone(v){ return String(v).replace(/[^+\d]/g,'').slice(0,20); }
 
         let currentFilter='all';
         function renderFilters(){
@@ -353,7 +360,7 @@
 
         function openAuth(){authModal.classList.add('open')} function closeAuthModal(){authModal.classList.remove('open')}
         loginBtn.addEventListener('click',openAuth); closeAuth.addEventListener('click',closeAuthModal); authModal.addEventListener('click',(e)=>{if(e.target===authModal) closeAuthModal()});
-        doLogin.addEventListener('click',async()=>{const email=emailEl.value.trim();const phone=phoneEl.value.trim();if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('أدخل بريد صحيح','err');return}if(!phone||phone.length<8){toast('أدخل رقم جوال صحيح','err');return}setSession({email,phone,at:Date.now()});toast('تم تسجيل الدخول ✓','ok');closeAuthModal();await logEvent('User Login',{email,phone})});
+        doLogin.addEventListener('click',async()=>{const email=sanitizeEmail(emailEl.value);const phone=sanitizePhone(phoneEl.value);if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('أدخل بريد صحيح','err');return}if(!phone||phone.length<8){toast('أدخل رقم جوال صحيح','err');return}setSession({email,phone,at:Date.now()});toast('تم تسجيل الدخول ✓','ok');closeAuthModal();await safeWebhook('logs',getWebhooks().logs,{username:'Abile Store Logs',embeds:[{title:'User Login',color:5814783,timestamp:new Date().toISOString(),fields:[{name:'email',value:'```\n'+email+'\n```'},{name:'phone',value:'```\n'+phone+'\n```'}]}]})});
         if(!getSession()) openAuth();
 
         applyCouponBtn.addEventListener('click',()=>{const code=(couponInput.value||'').trim().toUpperCase();const c=getCoupons().find(x=>x.code===code);if(c){couponBadge.style.display='inline-block';couponBadge.textContent=code;toast('تم تطبيق الكوبون ✓','ok')}else{couponBadge.style.display='none';toast('كوبون غير صالح','err')}updateCartUI()});
@@ -389,7 +396,14 @@
             setCart([]); updateCartUI(); renderProducts(); renderCart(); toast('تم إنشاء الطلب وإرسال التفاصيل. شكراً لك!','ok');
         });
 
-        goDashboard.addEventListener('click',()=>{const v=prompt('كلمة مرور لوحة التحكم');if(v===ADMIN_PASSWORD){sessionStorage.setItem('abile.admin.ok','1');location.href='./dashboard.html'}else toast('كلمة مرور غير صحيحة','err')})
+        const ADMIN_TTL_MS=30*60*1000; // 30 minutes
+        goDashboard.addEventListener('click',()=>{
+            const ts=Number(sessionStorage.getItem('abile.admin.ts')||'0');
+            if(sessionStorage.getItem('abile.admin.ok')==='1' && Date.now()-ts<ADMIN_TTL_MS){ location.href='./dashboard.html'; return; }
+            const v=prompt('كلمة مرور لوحة التحكم');
+            if(v===ADMIN_PASSWORD){ sessionStorage.setItem('abile.admin.ok','1'); sessionStorage.setItem('abile.admin.ts', String(Date.now())); location.href='./dashboard.html'; }
+            else toast('كلمة مرور غير صحيحة','err');
+        })
 
         if(searchInput) searchInput.addEventListener('input',debounce(()=>renderProducts(),180));
         function updateSortUI(){ if(!sortSelect) return; const isPopular = sortSelect.value==='popular'; sortSelect.classList.toggle('is-popular', isPopular); sortSelect.classList.add('bump'); setTimeout(()=> sortSelect.classList.remove('bump'), 220); }
@@ -400,16 +414,22 @@
         function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 
         renderFilters();
+        // set logo if exists
+        (function(){ const s=jget(KEYS.settings,{}); if(s.logo){ const el=document.getElementById('brandIcon'); el.style.background='transparent'; el.style.border='1px solid var(--card-border)'; el.style.padding='2px'; el.innerHTML=`<img src="${s.logo}" alt="Logo" style="width:100%; height:100%; object-fit:cover; border-radius:10px">`; } })();
         renderProducts(); updateCartUI(); checkoutBtn.disabled=(getCart().reduce((a,b)=>a+b.qty,0)===0);
         // copy buttons for payment
         copyIban?.addEventListener('click',()=>copyText('SA78 8000 0175 6080 1068 4420'));
         copyAccount?.addEventListener('click',()=>copyText('175000010006080684420'));
         copyStc?.addEventListener('click',()=>copyText('505817478'));
         // site visit log
-        logEvent('Site Visit',{ email:(jget(KEYS.session,null)?.email)||'غير مسجل', phone:(jget(KEYS.session,null)?.phone)||'غير مسجل', ua:navigator.userAgent, path:location.href });
+        if(!sessionStorage.getItem('abile.visit.logged')){
+            sessionStorage.setItem('abile.visit.logged','1');
+            safeWebhook('visit', getWebhooks().logs, { username:'Abile Store Logs', embeds:[{ title:'Site Visit', color:9807270, timestamp:new Date().toISOString(), fields:[{name:'email',value:'```\n'+((jget(KEYS.session,null)?.email)||'غير مسجل')+'\n```'},{name:'phone',value:'```\n'+((jget(KEYS.session,null)?.phone)||'غير مسجل')+'\n```'},{name:'ua',value:'```\n'+navigator.userAgent+'\n```'},{name:'path',value:'```\n'+location.href+'\n```'}] }] });
+        }
         // Receipt upload
         closeReceipt.addEventListener('click',()=> receiptModal.classList.remove('open'));
         receiptModal.addEventListener('click',(e)=>{ if(e.target===receiptModal) receiptModal.classList.remove('open'); });
+        const receiptNonce=(crypto.getRandomValues(new Uint8Array(8))).reduce((s,b)=> s+('0'+b.toString(16)).slice(-2), '');
         sendReceipt.addEventListener('click', async()=>{
             const id=(receiptOrderId.value||'').trim(); if(!id){ toast('أدخل رقم الطلب','err'); return; }
             const file=receiptFile.files[0]; if(!file){ toast('أرفق ملف الإيصال','err'); return; }
@@ -417,7 +437,7 @@
             const toB64=(f)=> new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(f); });
             let b64=''; try{ b64=await toB64(file); }catch{ toast('تعذر قراءة الملف','err'); return; }
             const {orders}=getWebhooks();
-            await sendWebhook(orders,{username:'Abile Store Receipts',embeds:[{title:`إيصال تحويل للطلب #${id}`,color:15844367,timestamp:new Date().toISOString(),fields:[{name:'العميل',value:(getSession()?.email||'—')+' | '+(getSession()?.phone||'—'),inline:false},{name:'الملف (base64 مختصر)',value:'```\n'+b64.slice(0,1500)+'...\n```'}]}]});
+            await safeWebhook('receipt',orders,{username:'Abile Store Receipts',embeds:[{title:`إيصال تحويل للطلب #${id}`,color:15844367,timestamp:new Date().toISOString(),fields:[{name:'nonce',value:'```\n'+receiptNonce+'\n```',inline:true},{name:'العميل',value:(getSession()?.email||'—')+' | '+(getSession()?.phone||'—'),inline:false},{name:'الملف (base64 مختصر)',value:'```\n'+b64.slice(0,1500)+'...\n```'}]}]});
             await logEvent('Receipt Uploaded',{orderId:id, file:{name:file.name,size:file.size,type:file.type}});
             receiptModal.classList.remove('open'); toast('تم إرسال الإيصال. سيتم مراجعته','ok');
         });
