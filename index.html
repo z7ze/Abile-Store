@@ -380,19 +380,21 @@
             let subtotal=0; const lines=[]; cart.forEach(it=>{ const p=prods.find(x=>x.id===it.id); if(p){ const lt={id:p.id,name:p.name,qty:it.qty,unit:p.price,total:+(p.price*it.qty).toFixed(2)}; subtotal+=lt.total; lines.push(lt); }});
             let total=subtotal; if(coupon){ if(coupon.type==='percent') total*=(1-coupon.value/100); else total=Math.max(0,total-coupon.value); } total=+total.toFixed(2);
             const next=prods.map(p=>{ const c=cart.find(i=>i.id===p.id); return c?{...p,qty:Math.max(0,p.qty-c.qty)}:p; }); setProducts(next);
-            const order={id:'ord_'+Math.random().toString(36).slice(2,10),at:new Date().toISOString(),status:'قيد المراجعة',email:session.email,phone:session.phone,coupon:coupon?coupon.code:null,subtotal,total,lines,method};
+            const order={id:String(Date.now())+String(Math.floor(Math.random()*1000)).padStart(3,'0'),at:new Date().toISOString(),status:'قيد المراجعة',email:session.email,phone:session.phone,coupon:coupon?coupon.code:null,subtotal,total,lines,method};
             const encrypted=await aesEncrypt(JSON.stringify({email:order.email,phone:order.phone}),(jget(KEYS.settings,{passphraseHint:'abile-default'}).passphraseHint||'abile-default'));
             const {orders}=getWebhooks();
             await sendWebhook(orders,{username:'Abile Store Orders',embeds:[{title:`طلب جديد #${order.id}`,color:5763719,timestamp:order.at,fields:[{name:'الإجمالي',value:fmt(total),inline:true},{name:'الكوبون',value:order.coupon||'—',inline:true},{name:'طريقة الدفع',value:order.method,inline:true},{name:'البريد',value:order.email||'—',inline:true},{name:'الجوال',value:order.phone||'—',inline:true},{name:'العناصر',value:'```json\n'+JSON.stringify(lines,null,2)+'\n```'},{name:'بيانات حساسة (AES-256)',value:'```\n'+encrypted+'\n```'}]}]});
             await logEvent('Order Placed',{orderId:order.id,total,lines,email:order.email,phone:order.phone,method:order.method});
             // save order local
             const all=getOrders(); all.push(order); setOrders(all);
+            // remember last order id for receipt modal (read-only)
+            localStorage.setItem('abile.lastOrderId', order.id);
             // show tracking link + open receipt modal prompt
             const track=location.origin+location.pathname.replace('index.html','')+'order.html?id='+order.id;
             toast('تم إنشاء الطلب. تم نسخ رابط التتبع ✓','ok');
             try{ await navigator.clipboard.writeText(track); }catch{}
             // Prefill receipt modal
-            receiptOrderId.value=order.id; receiptModal.classList.add('open');
+            receiptOrderId.value=order.id; receiptOrderId.readOnly=true; receiptModal.classList.add('open');
             setCart([]); updateCartUI(); renderProducts(); renderCart(); toast('تم إنشاء الطلب وإرسال التفاصيل. شكراً لك!','ok');
         });
 
@@ -431,7 +433,7 @@
         receiptModal.addEventListener('click',(e)=>{ if(e.target===receiptModal) receiptModal.classList.remove('open'); });
         const receiptNonce=(crypto.getRandomValues(new Uint8Array(8))).reduce((s,b)=> s+('0'+b.toString(16)).slice(-2), '');
         sendReceipt.addEventListener('click', async()=>{
-            const id=(receiptOrderId.value||'').trim(); if(!id){ toast('أدخل رقم الطلب','err'); return; }
+            const id=(localStorage.getItem('abile.lastOrderId')||'').trim(); if(!id){ toast('لا يوجد رقم طلب حديث','err'); return; }
             const file=receiptFile.files[0]; if(!file){ toast('أرفق ملف الإيصال','err'); return; }
             // convert to base64 brief (limit to ~1MB)
             const toB64=(f)=> new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(f); });
@@ -439,7 +441,8 @@
             const {orders}=getWebhooks();
             await safeWebhook('receipt',orders,{username:'Abile Store Receipts',embeds:[{title:`إيصال تحويل للطلب #${id}`,color:15844367,timestamp:new Date().toISOString(),fields:[{name:'nonce',value:'```\n'+receiptNonce+'\n```',inline:true},{name:'العميل',value:(getSession()?.email||'—')+' | '+(getSession()?.phone||'—'),inline:false},{name:'الملف (base64 مختصر)',value:'```\n'+b64.slice(0,1500)+'...\n```'}]}]});
             await logEvent('Receipt Uploaded',{orderId:id, file:{name:file.name,size:file.size,type:file.type}});
-            receiptModal.classList.remove('open'); toast('تم إرسال الإيصال. سيتم مراجعته','ok');
+            receiptModal.classList.remove('open'); toast('تم استلام الإيصال - يُرجى فتح تذكرة في ديسكورد','ok');
+            try{ window.open('https://discord.gg/hnMgK8zuXA','_blank'); }catch{}
         });
     </script>
 </body>
