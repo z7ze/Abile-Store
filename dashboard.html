@@ -123,6 +123,23 @@
             </section>
             <section class="card" style="grid-column: span 12;">
                 <div class="row" style="justify-content: space-between;">
+                    <h2>الفئات</h2>
+                    <button id="addCategory" class="btn">+ إضافة فئة</button>
+                </div>
+                <div style="overflow:auto; margin-top: 10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>اسم الفئة</th>
+                                <th>تحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catsBody"></tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="card" style="grid-column: span 12;">
+                <div class="row" style="justify-content: space-between;">
                     <h2>الطلبات</h2>
                     <div class="row">
                         <button id="refreshOrders" class="btn secondary">تحديث</button>
@@ -151,7 +168,7 @@
     <input id="importFile" type="file" accept="application/json" style="display:none" />
 
     <script>
-        const KEYS = { settings:'abile.settings', products:'abile.products', coupons:'abile.coupons', webhooks:'abile.webhooks' };
+        const KEYS = { settings:'abile.settings', products:'abile.products', coupons:'abile.coupons', webhooks:'abile.webhooks', categories:'abile.categories' };
         function jget(k,f){ try{ const v=localStorage.getItem(k); return v? JSON.parse(v): f; } catch { return f; } }
         function jset(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
         async function sendWebhook(url, content){ try{ await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(content) }); }catch(e){} }
@@ -180,6 +197,8 @@
         const importFile=document.getElementById('importFile');
         const ordersBody=document.getElementById('ordersBody');
         const refreshOrders=document.getElementById('refreshOrders');
+        const catsBody=document.getElementById('catsBody');
+        const addCategory=document.getElementById('addCategory');
 
         function getProducts(){ return jget(KEYS.products, []); }
         function setProducts(v){ jset(KEYS.products, v); }
@@ -191,6 +210,8 @@
         function setWebhooks(v){ jset(KEYS.webhooks, v); }
         function getOrders(){ return jget('abile.orders', []); }
         function setOrders(v){ jset('abile.orders', v); }
+        function getCategories(){ return jget(KEYS.categories, ['بطاقات','اشتراكات','عملات','خدمات','برامج']); }
+        function setCategories(v){ jset(KEYS.categories, v); }
 
         function renderSettings(){
             const s=getSettings(), w=getWebhooks();
@@ -282,6 +303,29 @@
             });
         }
 
+        function renderCategories(){
+            const list=getCategories();
+            catsBody.innerHTML='';
+            list.forEach((name, idx)=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`
+                    <td><input value="${name}"></td>
+                    <td>
+                        <div class="row">
+                            <button class="btn secondary" data-action="save">حفظ</button>
+                            <button class="btn ghost" data-action="delete">حذف</button>
+                        </div>
+                    </td>`;
+                tr.querySelector('[data-action="save"]').addEventListener('click', ()=>{
+                    const next=getCategories(); next[idx]=tr.querySelector('input').value.trim(); setCategories(next); alert('تم الحفظ');
+                });
+                tr.querySelector('[data-action="delete"]').addEventListener('click', ()=>{
+                    const next=getCategories().filter((_,i)=> i!==idx); setCategories(next); renderCategories();
+                });
+                catsBody.appendChild(tr);
+            });
+        }
+
         function renderOrders(){
             const list=getOrders();
             ordersBody.innerHTML='';
@@ -332,6 +376,8 @@
             setCoupons(list); renderCoupons();
         });
 
+        addCategory.addEventListener('click', ()=>{ const next=getCategories(); next.push('فئة جديدة'); setCategories(next); renderCategories(); });
+
         exportBtn.addEventListener('click', ()=>{
             const blob = new Blob([ JSON.stringify({ settings:getSettings(), products:getProducts(), coupons:getCoupons(), webhooks:getWebhooks() }, null, 2) ], { type: 'application/json' });
             const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'abile-backup.json'; a.click(); URL.revokeObjectURL(url);
@@ -353,7 +399,7 @@
 
         refreshOrders.addEventListener('click', renderOrders);
 
-        renderSettings(); renderProducts(); renderCoupons(); renderOrders();
+        renderSettings(); renderProducts(); renderCoupons(); renderOrders(); renderCategories();
     </script>
 </body>
 </html>
