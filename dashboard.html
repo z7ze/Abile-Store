@@ -72,6 +72,14 @@
                         <label class="muted">Webhook الطلبات</label>
                         <input id="whOrders" />
                     </div>
+                    <div style="grid-column: span 6;">
+                        <label class="muted">شعار المتجر</label>
+                        <input id="logoFile" type="file" accept="image/*" />
+                        <div class="row" style="margin-top:8px">
+                            <img id="logoPreview" alt="Logo" style="max-height:48px; border:1px solid var(--card-border); border-radius:8px; background:#0c0f16; padding:4px">
+                            <button id="clearLogo" class="btn ghost">إزالة</button>
+                        </div>
+                    </div>
                     <div style="grid-column: span 12;">
                         <button id="saveSettings" class="btn">حفظ الإعدادات</button>
                     </div>
@@ -190,6 +198,9 @@
         const whLogsEl=document.getElementById('whLogs');
         const whOrdersEl=document.getElementById('whOrders');
         const saveSettingsBtn=document.getElementById('saveSettings');
+        const logoFile=document.getElementById('logoFile');
+        const logoPreview=document.getElementById('logoPreview');
+        const clearLogo=document.getElementById('clearLogo');
         const addProductBtn=document.getElementById('addProduct');
         const addCouponBtn=document.getElementById('addCoupon');
         const exportBtn=document.getElementById('exportBtn');
@@ -219,6 +230,7 @@
             passphraseHintEl.value=s.passphraseHint||'';
             whLogsEl.value=w.logs||'';
             whOrdersEl.value=w.orders||'';
+            if(logoPreview){ logoPreview.src = s.logo || ''; logoPreview.style.display = s.logo? 'block':'none'; }
         }
 
         function sanitizeNumber(v, min=0){ const n = Number(v); return isFinite(n) ? Math.max(min, n) : min; }
@@ -357,8 +369,18 @@
             });
         }
 
+        function fileToDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+
+        logoFile?.addEventListener('change', async()=>{
+            const f=logoFile.files[0]; if(!f) return;
+            if(f.size > 512*1024){ alert('الملف كبير (أقصى 512KB)'); logoFile.value=''; return; }
+            try{ const data=await fileToDataURL(f); const s=getSettings(); s.logo=data; setSettings(s); renderSettings(); alert('تم تحديث الشعار'); }catch{ alert('تعذر قراءة الملف'); }
+        });
+        clearLogo?.addEventListener('click', ()=>{ const s=getSettings(); delete s.logo; setSettings(s); renderSettings(); });
+
         saveSettingsBtn.addEventListener('click', ()=>{
-            setSettings({ currency: currencyEl.value.trim()||'ر.س', passphraseHint: passphraseHintEl.value.trim() });
+            const s=getSettings();
+            setSettings({ currency: currencyEl.value.trim()||'ر.س', passphraseHint: passphraseHintEl.value.trim(), logo: s.logo||'' });
             setWebhooks({ logs: whLogsEl.value.trim(), orders: whOrdersEl.value.trim() });
             alert('تم حفظ الإعدادات');
         });
