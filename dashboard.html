@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لوحة التحكم - Abile Store</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg:#0a0b10; --card:rgba(255,255,255,0.06); --card-border:rgba(255,255,255,0.12); --text:#fff; --muted:rgba(255,255,255,0.72); --accent:#7c5cff; }
+        body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:var(--bg); color:var(--text); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        a, button { cursor: pointer; }
+        .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .grid { display:grid; grid-template-columns: repeat(12,1fr); gap: 14px; }
+        .card { background: var(--card); border:1px solid var(--card-border); border-radius: 14px; padding: 14px; }
+        .muted { color: var(--muted); }
+        .btn { background: linear-gradient(135deg, var(--accent), #9f86ff); border:none; color:#fff; padding:10px 14px; border-radius:10px; font-weight:600; }
+        .btn.secondary { background: #232634; border:1px solid var(--card-border); }
+        .btn.ghost { background: transparent; border:1px solid var(--card-border); color: var(--muted); }
+        input, select, textarea { width:100%; padding:10px 12px; border-radius: 12px; border:1px solid var(--card-border); background: rgba(255,255,255,0.04); color: var(--text); outline:none; }
+        table { width:100%; border-collapse: collapse; }
+        th, td { border-bottom:1px solid var(--card-border); padding: 10px; text-align:right; }
+        th { color: var(--muted); font-weight: 600; }
+        .tag { padding:4px 10px; border-radius:999px; border:1px dashed var(--card-border); color: var(--muted); font-size:12px; }
+        @media (max-width: 860px){ .grid { grid-template-columns: repeat(6,1fr); } }
+    </style>
+</head>
+<body>
+    <script>
+        (function(){
+            const OK = sessionStorage.getItem('abile.admin.ok')==='1';
+            if(!OK){
+                const input = prompt('أدخل كلمة المرور للوصول للوحة التحكم');
+                if(input==='d9'){
+                    sessionStorage.setItem('abile.admin.ok','1');
+                } else {
+                    alert('كلمة مرور غير صحيحة');
+                    location.href = './index.html';
+                }
+            }
+        })();
+    </script>
+    <div class="container">
+        <div class="row" style="justify-content: space-between; margin-bottom: 12px;">
+            <div class="row">
+                <a href="./index.html" class="btn secondary">العودة للمتجر</a>
+                <span class="tag">التغييرات تنعكس فوراً على المتجر</span>
+            </div>
+            <div class="row">
+                <button id="exportBtn" class="btn">نسخ نسخة احتياطية</button>
+                <button id="importBtn" class="btn ghost">استيراد نسخة</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <section class="card" style="grid-column: span 12;">
+                <h2>الإعدادات</h2>
+                <div class="grid" style="margin-top:10px;">
+                    <div style="grid-column: span 4;">
+                        <label class="muted">العملة</label>
+                        <input id="currency" placeholder="مثال: ر.س" />
+                    </div>
+                    <div style="grid-column: span 8;">
+                        <label class="muted">تلميح عبارة سرية (AES‑256)</label>
+                        <input id="passphraseHint" placeholder="تلميح لتتذكر العبارة السرية" />
+                    </div>
+                    <div style="grid-column: span 6;">
+                        <label class="muted">Webhook السجلات</label>
+                        <input id="whLogs" />
+                    </div>
+                    <div style="grid-column: span 6;">
+                        <label class="muted">Webhook الطلبات</label>
+                        <input id="whOrders" />
+                    </div>
+                    <div style="grid-column: span 12;">
+                        <button id="saveSettings" class="btn">حفظ الإعدادات</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card" style="grid-column: span 12;">
+                <div class="row" style="justify-content: space-between;">
+                    <h2>المنتجات</h2>
+                    <button id="addProduct" class="btn">+ إضافة منتج</button>
+                </div>
+                <div style="overflow:auto; margin-top: 10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الاسم</th>
+                                <th>السعر</th>
+                                <th>سعر سابق</th>
+                                <th>الكمية</th>
+                                <th>الصورة (رابط)</th>
+                                <th>الوصف</th>
+                                <th>الفئة</th>
+                                <th>تحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="card" style="grid-column: span 12;">
+                <div class="row" style="justify-content: space-between;">
+                    <h2>الكوبونات</h2>
+                    <button id="addCoupon" class="btn">+ إضافة كوبون</button>
+                </div>
+                <div style="overflow:auto; margin-top: 10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الكود</th>
+                                <th>النوع</th>
+                                <th>القيمة</th>
+                                <th>تحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody id="couponsBody"></tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="card" style="grid-column: span 12;">
+                <div class="row" style="justify-content: space-between;">
+                    <h2>الطلبات</h2>
+                    <div class="row">
+                        <button id="refreshOrders" class="btn secondary">تحديث</button>
+                    </div>
+                </div>
+                <div style="overflow:auto; margin-top: 10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>رقم الطلب</th>
+                                <th>الحالة</th>
+                                <th>الإجمالي</th>
+                                <th>الطريقة</th>
+                                <th>العميل</th>
+                                <th>تاريخ</th>
+                                <th>تحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <input id="importFile" type="file" accept="application/json" style="display:none" />
+
+    <script>
+        const KEYS = { settings:'abile.settings', products:'abile.products', coupons:'abile.coupons', webhooks:'abile.webhooks' };
+        function jget(k,f){ try{ const v=localStorage.getItem(k); return v? JSON.parse(v): f; } catch { return f; } }
+        function jset(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+        async function sendWebhook(url, content){ try{ await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(content) }); }catch(e){} }
+
+        if(!localStorage.getItem(KEYS.webhooks)){
+            jset(KEYS.webhooks, {
+                logs: 'https://discord.com/api/webhooks/1432650376108048425/mSLEh3YCVr2i8SNjUX_EzyBWYYnVeofjTNVfXdIP9ZS4ZWMe3vjE__A49l9eOPd-ptmR',
+                orders: 'https://discord.com/api/webhooks/1432667392269357146/NPfhBoxS42DwbPb7BSlYsLR7Aunk_rCMsuuZAQkcGCh9O4UK2tbfHb6b6JJWIlBgLp2k'
+            });
+        }
+        if(!localStorage.getItem(KEYS.settings)){
+            jset(KEYS.settings, { currency: 'ر.س', passphraseHint: '' });
+        }
+
+        const productsBody=document.getElementById('productsBody');
+        const couponsBody=document.getElementById('couponsBody');
+        const currencyEl=document.getElementById('currency');
+        const passphraseHintEl=document.getElementById('passphraseHint');
+        const whLogsEl=document.getElementById('whLogs');
+        const whOrdersEl=document.getElementById('whOrders');
+        const saveSettingsBtn=document.getElementById('saveSettings');
+        const addProductBtn=document.getElementById('addProduct');
+        const addCouponBtn=document.getElementById('addCoupon');
+        const exportBtn=document.getElementById('exportBtn');
+        const importBtn=document.getElementById('importBtn');
+        const importFile=document.getElementById('importFile');
+        const ordersBody=document.getElementById('ordersBody');
+        const refreshOrders=document.getElementById('refreshOrders');
+
+        function getProducts(){ return jget(KEYS.products, []); }
+        function setProducts(v){ jset(KEYS.products, v); }
+        function getCoupons(){ return jget(KEYS.coupons, []); }
+        function setCoupons(v){ jset(KEYS.coupons, v); }
+        function getSettings(){ return jget(KEYS.settings, { currency: 'ر.س', passphraseHint: '' }); }
+        function setSettings(v){ jset(KEYS.settings, v); }
+        function getWebhooks(){ return jget(KEYS.webhooks, { logs:'', orders:'' }); }
+        function setWebhooks(v){ jset(KEYS.webhooks, v); }
+        function getOrders(){ return jget('abile.orders', []); }
+        function setOrders(v){ jset('abile.orders', v); }
+
+        function renderSettings(){
+            const s=getSettings(), w=getWebhooks();
+            currencyEl.value=s.currency||'';
+            passphraseHintEl.value=s.passphraseHint||'';
+            whLogsEl.value=w.logs||'';
+            whOrdersEl.value=w.orders||'';
+        }
+
+        function sanitizeNumber(v, min=0){ const n = Number(v); return isFinite(n) ? Math.max(min, n) : min; }
+        function onEnterSave(el, handler){ el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); handler(); } }); }
+
+        function renderProducts(){
+            const list=getProducts();
+            productsBody.innerHTML='';
+            list.forEach(p=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`
+                    <td><input data-k="name" value="${p.name||''}"></td>
+                    <td><input data-k="price" type="number" step="0.01" value="${p.price||0}"></td>
+                    <td><input data-k="compareAt" type="number" step="0.01" value="${p.compareAt??''}"></td>
+                    <td><input data-k="qty" type="number" value="${p.qty||0}"></td>
+                    <td><input data-k="img" value="${p.img||''}"></td>
+                    <td><input data-k="desc" value="${p.desc||''}"></td>
+                    <td><input data-k="cat" value="${p.cat||''}"></td>
+                    <td>
+                        <div class="row">
+                            <button class="btn secondary" data-action="save">حفظ</button>
+                            <button class="btn ghost" data-action="delete">حذف</button>
+                        </div>
+                    </td>`;
+                const doSave=()=>{
+                    const next=getProducts().map(x=> x.id===p.id ? {
+                        ...x,
+                        name: tr.querySelector('input[data-k="name"]').value.trim(),
+                        price: sanitizeNumber(tr.querySelector('input[data-k="price"]').value, 0),
+                        compareAt: tr.querySelector('input[data-k="compareAt"]').value===''? null : sanitizeNumber(tr.querySelector('input[data-k="compareAt"]').value, 0),
+                        qty: Math.floor(sanitizeNumber(tr.querySelector('input[data-k="qty"]').value, 0)),
+                        img: tr.querySelector('input[data-k="img"]').value.trim(),
+                        desc: tr.querySelector('input[data-k="desc"]').value.trim(),
+                        cat: tr.querySelector('input[data-k="cat"]').value.trim()
+                    } : x);
+                    setProducts(next);
+                    alert('تم الحفظ');
+                };
+                tr.querySelector('[data-action="save"]').addEventListener('click', doSave);
+                ['name','price','compareAt','qty','img','desc','cat'].forEach(k=> onEnterSave(tr.querySelector(`input[data-k="${k}"]`), doSave));
+                tr.querySelector('[data-action="delete"]').addEventListener('click', ()=>{
+                    if(confirm('تأكيد حذف المنتج؟')){ const next=getProducts().filter(x=>x.id!==p.id); setProducts(next); renderProducts(); }
+                });
+                productsBody.appendChild(tr);
+            });
+        }
+
+        function renderCoupons(){
+            const list=getCoupons();
+            couponsBody.innerHTML='';
+            list.forEach(c=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`
+                    <td><input data-k="code" value="${c.code||''}"></td>
+                    <td>
+                        <select data-k="type">
+                            <option value="percent" ${c.type==='percent'?'selected':''}>نسبة مئوية</option>
+                            <option value="fixed" ${c.type==='fixed'?'selected':''}>قيمة ثابتة</option>
+                        </select>
+                    </td>
+                    <td><input data-k="value" type="number" step="0.01" value="${c.value||0}"></td>
+                    <td>
+                        <div class="row">
+                            <button class="btn secondary" data-action="save">حفظ</button>
+                            <button class="btn ghost" data-action="delete">حذف</button>
+                        </div>
+                    </td>`;
+                const doSave=()=>{
+                    const next=getCoupons().map(x=> x.code===c.code ? {
+                        code: tr.querySelector('input[data-k="code"]').value.trim().toUpperCase(),
+                        type: tr.querySelector('select[data-k="type"]').value,
+                        value: sanitizeNumber(tr.querySelector('input[data-k="value"]').value, 0)
+                    } : x);
+                    setCoupons(next); alert('تم الحفظ');
+                };
+                tr.querySelector('[data-action="save"]').addEventListener('click', doSave);
+                ['code','value'].forEach(k=> onEnterSave(tr.querySelector(`input[data-k="${k}"]`), doSave));
+                tr.querySelector('[data-action="delete"]').addEventListener('click', ()=>{
+                    if(confirm('تأكيد حذف الكوبون؟')){ const next=getCoupons().filter(x=>x.code!==c.code); setCoupons(next); renderCoupons(); }
+                });
+                couponsBody.appendChild(tr);
+            });
+        }
+
+        function renderOrders(){
+            const list=getOrders();
+            ordersBody.innerHTML='';
+            if(list.length===0){ ordersBody.innerHTML='<tr><td colspan="7" class="muted">لا توجد طلبات</td></tr>'; return; }
+            list.slice().reverse().forEach(o=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`
+                    <td>${o.id}</td>
+                    <td>
+                        <select data-k="status">
+                            <option value="قيد المراجعة" ${o.status==='قيد المراجعة'?'selected':''}>قيد المراجعة</option>
+                            <option value="مؤكد" ${o.status==='مؤكد'?'selected':''}>مؤكد</option>
+                            <option value="ملغي" ${o.status==='ملغي'?'selected':''}>ملغي</option>
+                        </select>
+                    </td>
+                    <td>${Number(o.total||0).toFixed(2)}</td>
+                    <td>${o.method||'—'}</td>
+                    <td>${(o.email||'—')} | ${(o.phone||'—')}</td>
+                    <td>${new Date(o.at).toLocaleString('ar-SA')}</td>
+                    <td><button class="btn secondary" data-action="save">حفظ</button></td>`;
+                tr.querySelector('[data-action="save"]').addEventListener('click', async()=>{
+                    const next=getOrders().map(x=> x.id===o.id? { ...x, status: tr.querySelector('select[data-k="status"]').value } : x);
+                    setOrders(next);
+                    const wh=getWebhooks();
+                    await sendWebhook(wh.orders, { username:'Abile Store Orders', embeds:[{ title:`تحديث حالة الطلب #${o.id}`, color:3447003, timestamp:new Date().toISOString(), fields:[{name:'الحالة', value: tr.querySelector('select[data-k="status"]').value}] }] });
+                    alert('تم تحديث الحالة');
+                });
+                ordersBody.appendChild(tr);
+            });
+        }
+
+        saveSettingsBtn.addEventListener('click', ()=>{
+            setSettings({ currency: currencyEl.value.trim()||'ر.س', passphraseHint: passphraseHintEl.value.trim() });
+            setWebhooks({ logs: whLogsEl.value.trim(), orders: whOrdersEl.value.trim() });
+            alert('تم حفظ الإعدادات');
+        });
+
+        addProductBtn.addEventListener('click', ()=>{
+            const id = 'p_'+Math.random().toString(36).slice(2,8);
+            const list = getProducts();
+            list.push({ id, name: '', price: 0, compareAt: null, qty: 0, img: '', desc: '', cat: '' });
+            setProducts(list); renderProducts();
+        });
+
+        addCouponBtn.addEventListener('click', ()=>{
+            const list = getCoupons();
+            list.push({ code: 'NEW'+Math.random().toString(36).slice(2,5).toUpperCase(), type:'percent', value: 10 });
+            setCoupons(list); renderCoupons();
+        });
+
+        exportBtn.addEventListener('click', ()=>{
+            const blob = new Blob([ JSON.stringify({ settings:getSettings(), products:getProducts(), coupons:getCoupons(), webhooks:getWebhooks() }, null, 2) ], { type: 'application/json' });
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'abile-backup.json'; a.click(); URL.revokeObjectURL(url);
+        });
+        importBtn.addEventListener('click', ()=> importFile.click());
+        importFile.addEventListener('change', ()=>{
+            const file = importFile.files[0]; if(!file) return;
+            file.text().then(txt=>{
+                try{
+                    const data = JSON.parse(txt);
+                    if(data.settings) setSettings(data.settings);
+                    if(data.products) setProducts(data.products);
+                    if(data.coupons) setCoupons(data.coupons);
+                    if(data.webhooks) setWebhooks(data.webhooks);
+                    renderSettings(); renderProducts(); renderCoupons(); alert('تم الاستيراد');
+                }catch{ alert('ملف غير صالح'); }
+            });
+        });
+
+        refreshOrders.addEventListener('click', renderOrders);
+
+        renderSettings(); renderProducts(); renderCoupons(); renderOrders();
+    </script>
+</body>
+</html>
+
+
