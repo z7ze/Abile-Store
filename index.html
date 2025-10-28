@@ -196,6 +196,12 @@
     </div></div>
 
     <div id="toasts" class="toasts"></div>
+    <!-- Floating Discord Button -->
+    <a href="https://discord.gg/hnMgK8zuXA" target="_blank" rel="noopener" aria-label="Discord" style="position:fixed; right:18px; bottom:18px; z-index:300; text-decoration:none;">
+        <div style="display:flex; align-items:center; gap:8px; background:linear-gradient(135deg,#5865F2,#6b75ff); color:#fff; padding:10px 14px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); box-shadow:0 10px 24px rgba(88,101,242,.35)">
+            <span style="font-weight:800">Discord</span>
+        </div>
+    </a>
 
     <!-- Receipt Upload Modal -->
     <div id="receiptModal" class="modal"><div class="panel" style="max-width:680px">
@@ -209,7 +215,7 @@
     <script>
         const canvas=document.getElementById('animatedCanvas');const ctx=canvas.getContext('2d');let pts=[];let mouseX=-1000,mouseY=-1000;function desired(){return Math.min(140,Math.max(60,Math.floor((innerWidth*innerHeight)/20000)))}function resize(){canvas.width=innerWidth;canvas.height=innerHeight;const t=desired();if(pts.length===0){for(let i=0;i<t;i++)pts.push(new P())}else if(pts.length<t){for(let i=pts.length;i<t;i++)pts.push(new P())}else if(pts.length>t){pts=pts.slice(0,t)}}class P{constructor(){this.x=Math.random()*canvas.width;this.y=Math.random()*canvas.height;this.vx=(Math.random()-.5)*.5;this.vy=(Math.random()-.5)*.5;this.r=1.7}u(){const dx=mouseX-this.x,dy=mouseY-this.y;const d=Math.hypot(dx,dy);if(d<160){const f=(160-d)/160;this.vx-=(dx/d)*f*.45;this.vy-=(dy/d)*f*.45}this.vx*=.985;this.vy*=.985;this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>canvas.width)this.vx*=-1;if(this.y<0||this.y>canvas.height)this.vy*=-1}d(){ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle='rgba(167,139,250,.55)';ctx.fill()}}function loop(){ctx.fillStyle='rgba(10,12,18,.35)';ctx.fillRect(0,0,canvas.width,canvas.height);for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y;const d=Math.hypot(dx,dy);if(d<130){const o=(1-d/130)*.3;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle=`rgba(167,139,250,${o})`;ctx.lineWidth=1;ctx.stroke()}}pts[i].u();pts[i].d()}requestAnimationFrame(loop)}addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY});addEventListener('resize',resize);resize();for(let i=0;i<desired();i++)pts.push(new P());loop();
 
-        const KEYS={settings:'abile.settings',products:'abile.products',coupons:'abile.coupons',cart:'abile.cart',session:'abile.session',webhooks:'abile.webhooks'};
+        const KEYS={settings:'abile.settings',products:'abile.products',coupons:'abile.coupons',cart:'abile.cart',session:'abile.session',webhooks:'abile.webhooks',categories:'abile.categories'};
         const WEBHOOK_DEFAULT_LOGS='https://discord.com/api/webhooks/1432650376108048425/mSLEh3YCVr2i8SNjUX_EzyBWYYnVeofjTNVfXdIP9ZS4ZWMe3vjE__A49l9eOPd-ptmR';
         const WEBHOOK_DEFAULT_ORDERS='https://discord.com/api/webhooks/1432667392269357146/NPfhBoxS42DwbPb7BSlYsLR7Aunk_rCMsuuZAQkcGCh9O4UK2tbfHb6b6JJWIlBgLp2k';
         const ADMIN_PASSWORD='d9ua';
@@ -226,6 +232,7 @@
 
         if(localStorage.getItem(KEYS.coupons)===null) jset(KEYS.coupons,[{code:'ABILE10',type:'percent',value:10},{code:'SAVE5',type:'fixed',value:5}]);
         if(localStorage.getItem(KEYS.settings)===null) jset(KEYS.settings,{currency:'ر.س',passphraseHint:'ضع عبارة سرية'});
+        if(localStorage.getItem(KEYS.categories)===null) jset(KEYS.categories,['بطاقات','اشتراكات','عملات','خدمات','برامج']);
 
         function getWebhooks(){try{const v=jget(KEYS.webhooks,{});return {logs:v.logs||WEBHOOK_DEFAULT_LOGS,orders:v.orders||WEBHOOK_DEFAULT_ORDERS}}catch{return {logs:WEBHOOK_DEFAULT_LOGS,orders:WEBHOOK_DEFAULT_ORDERS}}}
         async function sendWebhook(url,content){try{await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(content)})}catch(e){}}
@@ -242,6 +249,7 @@
         const searchInput=document.getElementById('searchInput');
         const sortSelect=document.getElementById('sortSelect');
         const filtersEl=document.getElementById('filters');
+        function getCategories(){ return jget(KEYS.categories, ['بطاقات','اشتراكات','عملات','خدمات','برامج']); }
         const loginBtn=document.getElementById('loginBtn');
         const goDashboard=document.getElementById('goDashboard');
         const authModal=document.getElementById('authModal');
@@ -282,6 +290,12 @@
         function copyText(t){navigator.clipboard?.writeText(t).then(()=>toast('تم النسخ ✓','ok')).catch(()=>{try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('تم النسخ ✓','ok');}catch{toast('تعذر النسخ','err');}})}
 
         let currentFilter='all';
+        function renderFilters(){
+            const cats=getCategories();
+            filtersEl.innerHTML='';
+            const allBtn=document.createElement('button'); allBtn.className='filter-btn active'; allBtn.setAttribute('data-cat','all'); allBtn.textContent='الكل'; filtersEl.appendChild(allBtn);
+            cats.forEach(c=>{ const b=document.createElement('button'); b.className='filter-btn'; b.setAttribute('data-cat',c); b.textContent=c; filtersEl.appendChild(b); });
+        }
         filtersEl.addEventListener('click',e=>{if(e.target.classList.contains('filter-btn')){document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');currentFilter=e.target.getAttribute('data-cat');renderProducts();}})
 
         function renderProducts(){
@@ -385,6 +399,7 @@
         addEventListener('scroll',()=>{if(scrollY>10) headerEl.classList.add('header-shadow'); else headerEl.classList.remove('header-shadow')})
         function debounce(fn,ms){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}}
 
+        renderFilters();
         renderProducts(); updateCartUI(); checkoutBtn.disabled=(getCart().reduce((a,b)=>a+b.qty,0)===0);
         // copy buttons for payment
         copyIban?.addEventListener('click',()=>copyText('SA78 8000 0175 6080 1068 4420'));
