@@ -98,6 +98,7 @@
             </div>
             <div class="row">
                 <button id="loginBtn" class="btn">تسجيل الدخول</button>
+                <button id="myOrdersBtn" class="btn ghost">طلباتي</button>
                 <button id="openCartBtn" class="btn ghost">السلة (<span id="cartCount">0</span>)</button>
                 <button id="goDashboard" class="btn secondary">لوحة التحكم</button>
             </div>
@@ -196,6 +197,12 @@
         <div id="quickBody"></div>
     </div></div>
 
+    <!-- My Orders Modal -->
+    <div id="myOrdersModal" class="modal"><div class="panel" style="max-width:860px">
+        <div class="space-between" style="margin-bottom:12px"><h3>طلباتي</h3><button id="closeMyOrders" class="btn ghost">×</button></div>
+        <div id="ordersList"></div>
+    </div></div>
+
     <div id="toasts" class="toasts"></div>
     <!-- Floating Discord Button -->
     <a href="https://discord.gg/hnMgK8zuXA" target="_blank" rel="noopener" aria-label="Discord" style="position:fixed; right:18px; bottom:18px; z-index:300; text-decoration:none;">
@@ -269,6 +276,10 @@
         const quickView=document.getElementById('quickView');
         const quickBody=document.getElementById('quickBody');
         const closeQuick=document.getElementById('closeQuick');
+        const myOrdersBtn=document.getElementById('myOrdersBtn');
+        const myOrdersModal=document.getElementById('myOrdersModal');
+        const closeMyOrders=document.getElementById('closeMyOrders');
+        const ordersList=document.getElementById('ordersList');
         const headerEl=document.querySelector('header');
         const toasts=document.getElementById('toasts');
         const copyIban=document.getElementById('copyIban');
@@ -291,6 +302,7 @@
         function setSession(v){jset(KEYS.session,v)}
         function getOrders(){return jget('abile.orders',[])}
         function setOrders(v){jset('abile.orders',v)}
+        function getMyOrders(){ const s=getSession(); if(!s) return []; const all=getOrders(); return all.filter(o=> o.email===s.email || o.phone===s.phone).sort((a,b)=> new Date(b.at)-new Date(a.at)); }
         function toast(msg,kind='ok'){const el=document.createElement('div');el.className='toast '+kind;el.textContent=msg;toasts.appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .4s';setTimeout(()=>el.remove(),420)},2400)}
         function copyText(t){navigator.clipboard?.writeText(t).then(()=>toast('تم النسخ ✓','ok')).catch(()=>{try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('تم النسخ ✓','ok');}catch{toast('تعذر النسخ','err');}})}
         function sanitizeEmail(v){ return String(v).trim().slice(0,120); }
@@ -368,6 +380,35 @@
 
         function openCartModal(){cartModal.classList.add('open');renderCart()} function closeCartModal(){cartModal.classList.remove('open')}
         openCartBtn.addEventListener('click',openCartModal); closeCart.addEventListener('click',closeCartModal); cartModal.addEventListener('click',e=>{if(e.target===cartModal) closeCartModal()});
+
+        function renderMyOrders(){
+            const list=getMyOrders();
+            if(list.length===0){ ordersList.innerHTML='<div class="muted">لا توجد طلبات لهذا الحساب</div>'; return; }
+            ordersList.innerHTML='';
+            list.forEach(o=>{
+                const wrap=document.createElement('div');
+                wrap.className='card';
+                wrap.style.marginBottom='10px';
+                wrap.style.padding='12px';
+                const track=location.origin+location.pathname.replace('index.html','')+'order.html?id='+o.id;
+                wrap.innerHTML=`
+                    <div class="space-between" style="margin-bottom:6px"><strong>#${o.id}</strong><span class="tag">${o.status||'قيد المراجعة'}</span></div>
+                    <div class="row" style="gap:16px; margin-bottom:8px">
+                        <div class="muted">الإجمالي: <strong>${fmt(o.total)}</strong></div>
+                        <div class="muted">الدفع: ${o.method||'—'}</div>
+                        <div class="muted">التاريخ: ${new Date(o.at).toLocaleString('ar-SA')}</div>
+                    </div>
+                    <div class="row">
+                        <a class="btn ghost" href="${track}" target="_blank">فتح التتبع</a>
+                        <button class="btn" data-copy="${track}">نسخ رابط التتبع</button>
+                    </div>`;
+                wrap.querySelector('[data-copy]')?.addEventListener('click', async(e)=>{ try{ await navigator.clipboard.writeText(e.currentTarget.getAttribute('data-copy')); toast('تم النسخ ✓','ok'); }catch{ toast('تعذر النسخ','err'); } });
+                ordersList.appendChild(wrap);
+            });
+        }
+        function openMyOrders(){ if(!getSession()){ openAuth(); return; } myOrdersModal.classList.add('open'); renderMyOrders(); }
+        function closeMyOrdersModal(){ myOrdersModal.classList.remove('open'); }
+        myOrdersBtn.addEventListener('click', openMyOrders); closeMyOrders.addEventListener('click', closeMyOrdersModal); myOrdersModal.addEventListener('click', e=>{ if(e.target===myOrdersModal) closeMyOrdersModal(); });
 
         checkoutBtn.addEventListener('click',async()=>{
             const cart=getCart();
