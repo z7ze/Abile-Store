@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <script type="module">
+    import { initFirebaseSync } from './sync-firebase.js';
+    window.addEventListener('DOMContentLoaded', () => initFirebaseSync());
+</script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Abile Store</title>
@@ -219,8 +223,9 @@
         <div class="row" style="margin-bottom:10px"><input id="receiptFile" type="file" accept="image/*,.pdf"></div>
         <button id="sendReceipt" class="btn">إرسال الإيصال</button>
     </div></div>
-
-    <script>
+    
+    <script type="module">
+    import { FirebaseDB } from './firebase-config.js';
         const canvas=document.getElementById('animatedCanvas');const ctx=canvas.getContext('2d');let pts=[];let mouseX=-1000,mouseY=-1000;function desired(){return Math.min(140,Math.max(60,Math.floor((innerWidth*innerHeight)/20000)))}function resize(){canvas.width=innerWidth;canvas.height=innerHeight;const t=desired();if(pts.length===0){for(let i=0;i<t;i++)pts.push(new P())}else if(pts.length<t){for(let i=pts.length;i<t;i++)pts.push(new P())}else if(pts.length>t){pts=pts.slice(0,t)}}class P{constructor(){this.x=Math.random()*canvas.width;this.y=Math.random()*canvas.height;this.vx=(Math.random()-.5)*.5;this.vy=(Math.random()-.5)*.5;this.r=1.7}u(){const dx=mouseX-this.x,dy=mouseY-this.y;const d=Math.hypot(dx,dy);if(d<160){const f=(160-d)/160;this.vx-=(dx/d)*f*.45;this.vy-=(dy/d)*f*.45}this.vx*=.985;this.vy*=.985;this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>canvas.width)this.vx*=-1;if(this.y<0||this.y>canvas.height)this.vy*=-1}d(){ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle='rgba(167,139,250,.55)';ctx.fill()}}function loop(){ctx.fillStyle='rgba(10,12,18,.35)';ctx.fillRect(0,0,canvas.width,canvas.height);for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y;const d=Math.hypot(dx,dy);if(d<130){const o=(1-d/130)*.3;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle=`rgba(167,139,250,${o})`;ctx.lineWidth=1;ctx.stroke()}}pts[i].u();pts[i].d()}requestAnimationFrame(loop)}addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY});addEventListener('resize',resize);resize();for(let i=0;i<desired();i++)pts.push(new P());loop();
 
         const KEYS={settings:'abile.settings',products:'abile.products',coupons:'abile.coupons',cart:'abile.cart',session:'abile.session',webhooks:'abile.webhooks',categories:'abile.categories'};
